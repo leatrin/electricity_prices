@@ -109,3 +109,27 @@ def forecast(dataset_input,training_months =[6,7,8],forecast_months = [9] ):
 
         y_pred = reg.predict(x_test_scaled)
         print('mse (sklearn): ', np.sqrt(mean_squared_error(y_test,y_pred)))
+
+
+def interpretable_coeff_reg_lin(dataset_input, months=[4, 5, 6, 7]):
+    dataset_input = dataset_input.fillna(method='ffill')
+    dataset_input=dataset_input.dropna()
+
+    bool_mask = []
+    for i in dataset_input.index.month:
+        bool_mask.append(i in months)
+
+    coeff_day = np.zeros((24,14))
+    for h in range(24) :
+        x_df = dataset_input.loc[(dataset_input.index.hour==h) & bool_mask]
+        x = np.array(x_df.drop(columns=['electricity_prices', 'Coal_prices']))
+        std_scale = preprocessing.StandardScaler().fit(x)
+        x_scaled = std_scale.transform(x)
+        Y = np.array(x_df['electricity_prices'])
+        reg = linear_model.LinearRegression().fit(x_scaled, Y)
+        std_day = np.array(x_df.drop(columns=['electricity_prices', 'Coal_prices']).astype('float').std())
+        coeff_day[h] = [reg.coef_[i]/std_day[i] for i in range(len(std_day))]
+
+
+    coeff_dataframe = pd.DataFrame(coeff_day, columns=x_df.drop(columns=['electricity_prices', 'Coal_prices']).columns)
+    return coeff_dataframe
